@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Rollout Planner</title>
+<meta name="description" content="How do we roll out an AI tool? A phased plan with pilot size, timeline, cost and success metrics, generated from readable rules. Built with sample data.">
+<style>
+  :root {
+    --bg: #07090d;
+    --panel: #0e131a;
+    --panel-2: #141b24;
+    --border: #1f2935;
+    --text: #e6edf3;
+    --muted: #8a97a6;
+    --cyan: #22d3ee;
+    --amber: #fbbf24;
+    --green: #34d399;
+    --purple: #a78bfa;
+    --red: #f87171;
+    --radius: 12px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 56px; }
+  a { color: var(--cyan); }
+
+  header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); font-weight: 600; }
+  h1 { margin: 4px 0 2px; font-size: clamp(24px, 4vw, 32px); line-height: 1.15; }
+  .sub { color: var(--muted); margin: 0; }
+  .sample-note {
+    border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+    background: color-mix(in srgb, var(--amber) 10%, transparent);
+    color: var(--amber); border-radius: 999px; padding: 6px 14px; font-size: 13px;
+  }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .panel .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-top: 3px solid var(--accent, var(--cyan)); border-radius: var(--radius); padding: 14px 16px; min-width: 0; }
+  .card .label { color: var(--muted); font-size: 13px; }
+  .card .value { font-size: 26px; font-weight: 700; margin: 2px 0; font-variant-numeric: tabular-nums; }
+  .card .hint { color: var(--muted); font-size: 12.5px; }
+  @media (max-width: 420px) {
+    .card { padding: 12px; }
+    .card .value { font-size: 22px; }
+  }
+
+  .grid { display: grid; gap: 16px; margin-bottom: 16px; }
+  @media (min-width: 900px) {
+    .grid.two { grid-template-columns: 1fr 1.4fr; }
+    .grid.two-even { grid-template-columns: 1fr 1fr; }
+  }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; min-width: 0; }
+  .panel h2 { margin: 0 0 4px; font-size: 18px; }
+  .panel .lead { color: var(--muted); margin: 0 0 14px; font-size: 13.5px; }
+  .tag-title { display: inline-block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+  .mb { margin-bottom: 16px; }
+
+  .inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .field .input-wrap { display: flex; align-items: center; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 0 10px; }
+  .field .input-wrap:focus-within { border-color: var(--cyan); }
+  .field input, .field select { width: 100%; min-width: 0; background: transparent; border: 0; color: var(--text); font: inherit; font-size: 16px; padding: 8px 4px; outline: none; font-variant-numeric: tabular-nums; }
+  .field select option { background: var(--panel-2); }
+  .field .unit { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .field.wide { grid-column: 1 / -1; }
+  .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  button.btn { background: transparent; color: var(--cyan); border: 1px solid color-mix(in srgb, var(--cyan) 50%, transparent); border-radius: 8px; padding: 7px 14px; font: inherit; cursor: pointer; }
+  button.btn:hover { background: color-mix(in srgb, var(--cyan) 12%, transparent); }
+  button.btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+  .small { color: var(--muted); font-size: 12.5px; }
+
+  .alerts { display: grid; gap: 10px; margin-bottom: 16px; }
+  .alerts:empty { display: none; }
+  .alert { border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: var(--radius); padding: 10px 14px; }
+  .alert .kind { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--accent); }
+  .alert p { margin: 2px 0 0; }
+
+  .phases { display: grid; gap: 12px; }
+  .phase { background: var(--panel-2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .phase-head { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; justify-content: space-between; }
+  .phase h3 { margin: 0; font-size: 16px; }
+  .phase h3 .num { color: var(--accent); margin-right: 6px; }
+  .phase .dates { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .phase .meta { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--muted); margin: 6px 0 8px; }
+  .phase .meta strong { color: var(--text); font-weight: 600; }
+  .phase .why { font-size: 13.5px; margin: 0 0 8px; padding: 6px 10px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .phase .why b { color: var(--accent); }
+  .phase h4 { margin: 10px 0 4px; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .phase ul { margin: 0; padding-left: 20px; }
+  .phase li { margin: 2px 0; }
+
+  .timeline svg { display: block; }
+  .timeline text { font: 12.5px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--text); }
+  .timeline text.axis { fill: var(--muted); font-size: 11.5px; }
+  .timeline text.mark { font-size: 11.5px; font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; }
+  td.formula { color: var(--muted); font-size: 13px; text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+  tr.total td { font-weight: 700; border-bottom: 0; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+
+  dl.defs { display: grid; grid-template-columns: minmax(120px, max-content) 1fr; gap: 8px 18px; margin: 0; }
+  dl.defs dt { font-weight: 600; color: var(--cyan); }
+  dl.defs dd { margin: 0; }
+  @media (max-width: 560px) {
+    dl.defs { grid-template-columns: 1fr; gap: 2px; }
+    dl.defs dd { margin-bottom: 8px; }
+  }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--cyan); }
+  details ul { margin: 8px 0 0; padding-left: 20px; font-size: 13.5px; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 24px; text-align: center; }
+  .status { min-height: 1.5em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">AI Rollout Planner</div>
+      <h1>How do we roll this AI tool out?</h1>
+      <p class="sub" id="subtitle">A phased plan built from readable rules, not AI. Change the facts and the plan updates.</p>
+    </div>
+    <div class="sample-note">Built with sample data to protect confidentiality.</div>
+  </header>
+
+  <div class="grid two">
+    <section class="panel" aria-labelledby="inputs-h">
+      <span class="tag-title" style="color:var(--cyan)">Inputs</span>
+      <h2 id="inputs-h">Company facts</h2>
+      <p class="lead">Defaults describe Maplebridge Labs, a fictional 200-person company. Prices are SAMPLE values, not real vendor pricing.</p>
+      <form class="inputs" id="inputs" onsubmit="return false">
+        <div class="field wide">
+          <label for="toolType">AI tool type</label>
+          <div class="input-wrap"><select id="toolType"></select></div>
+        </div>
+        <div class="field">
+          <label for="headcount">Headcount</label>
+          <div class="input-wrap"><input id="headcount" type="number" inputmode="numeric" min="1" step="1"><span class="unit">people</span></div>
+        </div>
+        <div class="field">
+          <label for="teams">Teams</label>
+          <div class="input-wrap"><input id="teams" type="number" inputmode="numeric" min="1" step="1"><span class="unit">teams</span></div>
+        </div>
+        <div class="field">
+          <label for="scopePct">Staff in scope</label>
+          <div class="input-wrap"><input id="scopePct" type="number" inputmode="numeric" min="1" max="100" step="1"><span class="unit">%</span></div>
+        </div>
+        <div class="field">
+          <label for="idp">Identity provider</label>
+          <div class="input-wrap"><select id="idp"></select></div>
+        </div>
+        <div class="field">
+          <label for="scim">Automatic account setup (SCIM)</label>
+          <div class="input-wrap"><select id="scim"><option value="yes">Yes</option><option value="no">No, created by hand</option></select></div>
+        </div>
+        <div class="field">
+          <label for="price">Price per seat (SAMPLE)</label>
+          <div class="input-wrap"><span class="unit">$</span><input id="price" type="number" inputmode="decimal" min="0" step="1"><span class="unit">/ month</span></div>
+        </div>
+        <div class="field">
+          <label for="budget">Budget per seat</label>
+          <div class="input-wrap"><span class="unit">$</span><input id="budget" type="number" inputmode="decimal" min="0" step="1"><span class="unit">/ month</span></div>
+        </div>
+        <div class="field">
+          <label for="target">Target date (everyone has access)</label>
+          <div class="input-wrap"><input id="target" type="date"></div>
+        </div>
+      </form>
+      <div class="actions">
+        <button type="button" class="btn" id="reset">Reset to defaults</button>
+        <span class="small">Changing the tool type resets its sample price and staff in scope.</span>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="summary-h">
+      <span class="tag-title" style="color:var(--green)">Plan</span>
+      <h2 id="summary-h">Summary</h2>
+      <p class="lead" id="summary-lead"></p>
+      <div class="alerts" id="alerts"></div>
+      <section class="cards" id="cards" aria-label="Plan headline numbers"></section>
+      <div class="actions">
+        <button type="button" class="btn" id="copy">Copy plan as text</button>
+        <button type="button" class="btn" id="download">Download as Markdown</button>
+        <span class="small status" id="export-status" role="status"></span>
+      </div>
+    </section>
+  </div>
+
+  <section class="panel mb" aria-labelledby="timeline-h">
+    <span class="tag-title" style="color:var(--purple)">Timeline</span>
+    <h2 id="timeline-h">Back-calculated from the target date</h2>
+    <p class="lead" id="timeline-lead"></p>
+    <div class="legend">
+      <span><i style="background:var(--amber)"></i>Today</span>
+      <span><i style="background:var(--green)"></i>Target date</span>
+    </div>
+    <div class="timeline" id="timeline"></div>
+  </section>
+
+  <section class="panel mb" aria-labelledby="phases-h">
+    <span class="tag-title" style="color:var(--cyan)">Phases</span>
+    <h2 id="phases-h">The plan, phase by phase</h2>
+    <p class="lead">Each phase has tasks, an owner, a duration and exit criteria. The highlighted line says which rule put it there.</p>
+    <div class="phases" id="phases"></div>
+  </section>
+
+  <div class="grid two-even">
+    <section class="panel" aria-labelledby="cost-h">
+      <span class="tag-title" style="color:var(--amber)">Cost</span>
+      <h2 id="cost-h">Cost estimate</h2>
+      <p class="lead">Seats × price × months. Uses the SAMPLE price above, so swap in your real quote.</p>
+      <div class="table-scroll"><table id="cost-table"></table></div>
+      <p class="small" id="cost-note"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="metrics-h">
+      <span class="tag-title" style="color:var(--green)">Measure</span>
+      <h2 id="metrics-h">Success metrics</h2>
+      <p class="lead">Same definitions as the <a href="https://sr-tech-hub.github.io/ai-value-tracker/">AI Value Tracker</a>, which is where you measure them once the tool is live.</p>
+      <dl class="defs" id="metrics"></dl>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="rules-h" style="margin-top:16px">
+    <span class="tag-title" style="color:var(--purple)">Method</span>
+    <h2 id="rules-h">The rules behind the plan</h2>
+    <p class="lead">Fixed, readable rules, so anyone can check why a step is there. They live in one config at the top of the page's script.</p>
+    <ul id="rules"></ul>
+  </section>
+
+  <footer>Built with sample data to protect confidentiality. Maplebridge Labs is a fictional company. Part of a set: AI Tool Risk Triage, AI Rollout Planner, <a href="https://sr-tech-hub.github.io/ai-value-tracker/">AI Value Tracker</a>.</footer>
+</div>
+
+<script>
+'use strict';
+
+// Every rule the plan uses. Change a number here and the plan, the export and
+// the "rules behind the plan" list all follow, because they read from this one place.
+const CONFIG = {
+  defaults: { toolType: 'general', headcount: 200, teams: 8, idp: 'google', scim: 'yes', budget: 30, leadWeeks: 16 },
+  // SAMPLE prices: illustrative only, not any vendor's real pricing.
+  toolTypes: {
+    general: {
+      label: 'General assistant (chat, writing, research)', short: 'general assistant',
+      samplePrice: 25, scopePct: 100, taskTypes: 'writing, summarizing and research',
+      prepTasks: [
+        'Write an acceptable-use policy: what may go into prompts (no customer personal data, passwords or secrets) and what needs a human check before it is sent out.',
+        'Classify your data (public, internal, confidential, restricted) and say which classes are allowed in the tool.',
+        'In the tool\'s admin console, set data retention and turn off use of your data for model training if the vendor offers that setting; confirm against the vendor\'s terms.',
+      ],
+      pilotPick: 'a mix of roles from every team, including a few sceptics',
+    },
+    coding: {
+      label: 'Coding assistant', short: 'coding assistant',
+      samplePrice: 20, scopePct: 25, taskTypes: 'coding',
+      prepTasks: [
+        'Decide which code repositories may be used with the tool; exclude any that hold secrets or regulated code.',
+        'Agree a review rule: AI-written code gets the same code review and tests as human-written code.',
+        'Ask Legal to check the licence and intellectual-property terms for generated code.',
+        'Make sure secret scanning runs on every repository before the tool is switched on.',
+      ],
+      pilotPick: 'developers from each engineering team, mixing senior and junior',
+    },
+    meetings: {
+      label: 'Meeting / notes assistant', short: 'meeting assistant',
+      samplePrice: 15, scopePct: 100, taskTypes: 'summarizing',
+      prepTasks: [
+        'With Legal, check recording and transcription consent rules for every location where you have staff or customers.',
+        'List meetings the assistant must never join (HR, legal, board, performance reviews).',
+        'Decide how long transcripts are kept and who can see them, then set that in the admin console.',
+        'Set the default to announce the assistant in every meeting it joins.',
+      ],
+      pilotPick: 'people with heavy meeting loads (managers, sales, support leads) from each team',
+    },
+  },
+  idps: {
+    google: { label: 'Google Workspace', ssoWhere: 'the Google Admin console (add the tool as a SAML app)' },
+    entra: { label: 'Microsoft Entra ID', ssoWhere: 'Microsoft Entra ID (add the tool as an enterprise application)' },
+    okta: { label: 'Okta', ssoWhere: 'Okta (add the tool as an application)' },
+    none: { label: 'None', ssoWhere: null },
+  },
+  pilot: { share: 0.10, min: 10, max: 50, perTeamMin: 2 },
+  champions: { perTeam: 1, bigTeamSize: 30, perBigTeam: 2 },
+  waves: { targetSize: 100, maxWaves: 4, weeksEach: 2 },
+  weeks: { prep: 2, largeOrgExtraPrep: 1, largeOrg: 1000, sso: 1, scim: 1, noIdp: 2, pilot: 4, training: 2, measure: 12 },
+  // Same definitions and defaults as the AI Value Tracker.
+  metrics: { utilizationTarget: 0.70, pilotUtilizationTarget: 0.70, unusedDays: 30, hourlyRate: 50 },
+  noIdpWarnAbove: 50,
+  trackerUrl: 'https://sr-tech-hub.github.io/ai-value-tracker/',
+};
+
+const PHASE_COLORS = ['var(--purple)', 'var(--cyan)', 'var(--amber)', 'var(--green)', 'var(--cyan)', 'var(--purple)'];
+const DAY = 86400000;
+
+// ---------- small helpers ----------
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = (n) => '$' + Math.round(n).toLocaleString('en-US');
+const plural = (n, word, many = word + 's') => `${n.toLocaleString('en-US')} ${n === 1 ? word : many}`;
+const weeks = (n) => plural(n, 'week');
+
+// Dates are handled at local midnight so time zones never shift a day.
+function parseDate(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
+function isoDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const addWeeks = (d, n) => addDays(d, n * 7);
+const fmtDate = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtShort = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+function today() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+
+function defaultTarget() {
+  // leadWeeks from today, moved forward to a Friday so go-live never lands on a weekend.
+  let d = addWeeks(today(), CONFIG.defaults.leadWeeks);
+  while (d.getDay() !== 5) d = addDays(d, 1);
+  return d;
+}
+
+// ---------- the one function that builds the plan ----------
+function buildPlan(inp) {
+  const tool = CONFIG.toolTypes[inp.toolType];
+  const idp = CONFIG.idps[inp.idp];
+  const hasIdp = inp.idp !== 'none';
+  const scim = inp.scim === 'yes';
+  const W = CONFIG.weeks;
+  const alerts = [];
+
+  // Who gets the tool
+  const audience = Math.max(1, Math.round(inp.headcount * inp.scopePct / 100));
+  const teamsInScope = Math.max(1, Math.min(audience, Math.round(inp.teams * inp.scopePct / 100)));
+  const avgTeam = audience / teamsInScope;
+
+  // Pilot: a share of the audience, at least 2 per team, within the min/max band, never more than everyone.
+  const P = CONFIG.pilot;
+  const pilotRaw = Math.max(Math.round(audience * P.share), P.perTeamMin * teamsInScope, P.min);
+  const pilotSize = Math.min(audience, P.max, pilotRaw);
+  const C = CONFIG.champions;
+  const perTeamChampions = avgTeam > C.bigTeamSize ? C.perBigTeam : C.perTeam;
+  const champions = Math.min(pilotSize, teamsInScope * perTeamChampions);
+
+  // Waves after the pilot
+  const remaining = audience - pilotSize;
+  const waveCount = remaining > 0 ? Math.min(CONFIG.waves.maxWaves, Math.ceil(remaining / CONFIG.waves.targetSize)) : 0;
+  const waveSize = waveCount ? Math.ceil(remaining / waveCount) : 0;
+  const teamsPerWave = waveCount ? Math.ceil(teamsInScope / waveCount) : 0;
+
+  // Durations
+  const largeOrg = inp.headcount > W.largeOrg;
+  const prepWeeks = W.prep + (largeOrg ? W.largeOrgExtraPrep : 0);
+  const ssoWeeks = hasIdp ? W.sso + (scim ? W.scim : 0) : W.noIdp;
+  const waveWeeks = Math.max(1, waveCount * CONFIG.waves.weeksEach);
+  const toolShort = tool.short;
+
+  const phases = [
+    {
+      key: 'prep', name: 'Prep: policy, data rules, admin settings', owner: 'IT lead with Security and Legal/HR',
+      weeks: prepWeeks,
+      why: largeOrg
+        ? `Every rollout starts here. ${weeks(W.prep)} base, plus ${weeks(W.largeOrgExtraPrep)} because headcount is over ${W.largeOrg.toLocaleString('en-US')} (more people to sign off).`
+        : `Every rollout starts here: nobody gets a seat until the rules are written. ${weeks(W.prep)} is the base for any size up to ${W.largeOrg.toLocaleString('en-US')} people.`,
+      tasks: [
+        ...tool.prepTasks,
+        'Pick an admin owner and a backup; turn on the admin audit log if the tool offers one.',
+        'Add an "AI tool access" request type to the service desk so requests are tracked.',
+      ],
+      exit: [
+        'Policy approved by IT, Security and Legal/HR, and published where staff can find it.',
+        'Admin settings chosen and written down (retention, sharing, audit log).',
+      ],
+    },
+    {
+      key: 'identity', name: hasIdp ? (scim ? 'Single sign-on and automatic account setup' : 'Single sign-on, accounts added by hand') : 'Account setup without an identity provider',
+      owner: 'IT admin (identity)', weeks: ssoWeeks,
+      why: hasIdp
+        ? (scim
+          ? `${idp.label} is set as identity provider with SCIM available: ${weeks(W.sso)} for SSO plus ${weeks(W.scim)} to set up and test automatic accounts.`
+          : `${idp.label} handles sign-in, but there is no SCIM, so accounts are added by hand: ${weeks(W.sso)} for SSO, plus a manual leaver check.`)
+        : `No identity provider, so sign-in and offboarding are manual: ${weeks(W.noIdp)} to set up invites and a checklist.`,
+      tasks: hasIdp
+        ? [
+          `Enable SAML single sign-on (SSO) in the tool's admin console and connect it in ${idp.ssoWhere}.`,
+          'Create one access group (for example "AI-' + toolShort.split(' ')[0] + '-users") and assign the tool to that group only.',
+          scim
+            ? 'Turn on automatic account setup (SCIM) so joining the group creates the account and leaving it removes the account.'
+            : 'If the tool supports creating accounts on first SSO sign-in, turn that on; otherwise invite users from the group list.',
+          scim
+            ? 'Test with a dummy user: add to group, sign in, remove from group, confirm the seat is freed.'
+            : 'Add "remove AI tool seat" to the leaver checklist and run a weekly check of seats against the group.',
+          'Turn off password sign-in for the tool if it allows SSO-only.',
+        ]
+        : [
+          'Verify your company email domain in the tool so only company addresses can join.',
+          'Invite users by email and require multi-factor sign-in if the tool offers it.',
+          'Keep a seat register (who, when, which team) and add "remove AI tool seat" to the leaver checklist.',
+          'Run a weekly check of the seat register against the staff list.',
+        ],
+      exit: hasIdp
+        ? [
+          'A test user signs in through SSO with no separate password.',
+          scim ? 'Removing the test user from the group removes their account automatically.' : 'The leaver checklist step has been tested once end to end.',
+        ]
+        : ['Only company email addresses can join.', 'The seat register matches the staff list.'],
+    },
+    {
+      key: 'pilot', name: `Pilot with ${plural(pilotSize, 'person', 'people')}`, owner: 'IT lead with team champions',
+      weeks: W.pilot,
+      why: `Pilot is ${Math.round(P.share * 100)}% of ${plural(audience, 'person', 'people')} in scope, at least ${P.perTeamMin} per team and between ${P.min} and ${P.max} people. Champions: ${perTeamChampions} per team${perTeamChampions > 1 ? ` (teams average over ${C.bigTeamSize} people)` : ''}.`,
+      tasks: [
+        `Choose ${plural(pilotSize, 'pilot user')}: ${tool.pilotPick}.`,
+        `Name ${plural(champions, 'champion')} (${perTeamChampions} per team in scope) to collect use cases and answer first questions.`,
+        `Set a baseline before seats go live: how long ${tool.taskTypes} tasks take today.`,
+        'Run a 30-minute kickoff: the policy, how to sign in, where to ask for help.',
+        'Collect use cases and problems weekly in one shared channel or form.',
+        'Hold a go / no-go review at the end of the pilot.',
+      ],
+      exit: [
+        `Pilot utilization at least ${Math.round(CONFIG.metrics.pilotUtilizationTarget * 100)}% (active ÷ paid seats).`,
+        'At least 3 repeatable use cases written up per team.',
+        'No open security or data issues.',
+        'Go / no-go decision recorded.',
+      ],
+    },
+    {
+      key: 'training', name: 'Training', owner: 'Champions with IT',
+      weeks: W.training,
+      why: `Training comes before the waves so people get a seat and a session together. ${weeks(W.training)} to build the materials and run the first sessions.`,
+      tasks: [
+        'Turn the best pilot use cases into a one-page quick-start guide per team.',
+        `Book ${plural(Math.max(1, Math.ceil(remaining / 30)), 'session')} of up to 30 people, led by a champion, recorded for later.`,
+        'Teach the data rules with real examples of what not to paste in.',
+        'Start weekly drop-in office hours that run through the waves.',
+      ],
+      exit: [
+        'Quick-start guide published.',
+        'Every person in wave 1 has a session booked.',
+      ],
+    },
+    {
+      key: 'waves', name: waveCount ? `Wider rollout in ${plural(waveCount, 'wave')}` : 'Open to everyone', owner: 'IT service desk',
+      weeks: waveWeeks,
+      why: waveCount
+        ? `${plural(remaining, 'person', 'people')} left after the pilot. Aim for about ${CONFIG.waves.targetSize} per wave, never more than ${CONFIG.waves.maxWaves} waves, ${weeks(CONFIG.waves.weeksEach)} each: ${plural(waveCount, 'wave')} of about ${waveSize}.`
+        : 'The pilot already covers everyone in scope, so there is nothing to stage.',
+      tasks: waveCount
+        ? [
+          `Add about ${waveSize} people (${teamsPerWave} ${teamsPerWave === 1 ? 'team' : 'teams'}) to the access group per wave, starting with the teams whose pilot results were strongest.`,
+          'Send a welcome message with the quick-start guide and the policy the day before each wave.',
+          'Watch service desk tickets for the first week of each wave.',
+          'Check each wave\'s utilization two weeks after it starts; send a nudge to anyone not yet active.',
+        ]
+        : ['Confirm every pilot user is still active and close the pilot.'],
+      exit: [
+        `All ${plural(audience, 'seat')} assigned.`,
+        `Utilization at least ${Math.round(CONFIG.metrics.utilizationTarget * 100)}% for each wave two weeks after it starts.`,
+        'Service desk ticket volume back to normal.',
+      ],
+    },
+    {
+      key: 'measure', name: 'Measure', owner: 'IT lead with Finance',
+      weeks: W.measure, afterTarget: true,
+      why: `Runs for ${weeks(W.measure)} after the target date, so the 30, 60 and 90-day reviews use real usage.`,
+      tasks: [
+        'Monthly: export usage from the admin console and load it into the AI Value Tracker.',
+        `Reclaim seats with no activity for ${CONFIG.metrics.unusedDays}+ days.`,
+        'Survey a sample of users on time saved per task type.',
+        'At 90 days: report utilization, hours saved and ROI, and decide to expand, hold or cut.',
+      ],
+      exit: [
+        'Three monthly reports delivered.',
+        'Expand / hold / cut decision made and recorded.',
+      ],
+    },
+  ];
+
+  // Back-calculate: phases 0-4 end on the target date, measure starts the day after.
+  const target = inp.target;
+  const buildWeeks = phases.filter((p) => !p.afterTarget).reduce((s, p) => s + p.weeks, 0);
+  const start = addWeeks(target, -buildWeeks);
+  let cursor = start;
+  for (const p of phases) {
+    if (p.afterTarget) { p.start = target; p.end = addWeeks(target, p.weeks); continue; }
+    p.start = cursor;
+    p.end = addWeeks(cursor, p.weeks);
+    cursor = p.end;
+  }
+  const slackDays = Math.round((start - today()) / DAY);
+  if (slackDays < 0) {
+    const earliest = addWeeks(today(), buildWeeks);
+    alerts.push({ kind: 'Timeline', color: 'var(--red)',
+      text: `The plan needs ${weeks(buildWeeks)} but the target is ${fmtDate(target)}, so it would have started ${plural(Math.ceil(-slackDays / 7), 'week')} ago. Earliest realistic target: ${fmtDate(earliest)}, or shrink the scope.` });
+  }
+
+  // Cost: seats × price × months. A month is counted as 52/12 weeks, rounded up, because seats are billed monthly.
+  const WEEKS_PER_MONTH = 52 / 12;
+  const pilotWeeks = phases[2].weeks + phases[3].weeks;
+  const pilotMonths = Math.max(1, Math.ceil(pilotWeeks / WEEKS_PER_MONTH));
+  const waveMonths = waveCount ? Math.max(1, Math.ceil(waveWeeks / WEEKS_PER_MONTH)) : 0;
+  const pilotCost = pilotSize * inp.price * pilotMonths;
+  // During the waves, the average seat count is halfway between the pilot and everyone.
+  const rampSeats = waveCount ? Math.round((pilotSize + audience) / 2) : 0;
+  const rampCost = rampSeats * inp.price * waveMonths;
+  const fullMonthly = audience * inp.price;
+  const fullYear = fullMonthly * 12;
+  const cost = {
+    rows: [
+      { label: 'Pilot + training', seats: pilotSize, months: pilotMonths, total: pilotCost, formula: `${pilotSize} seats × ${money(inp.price)} × ${pilotMonths} mo` },
+      ...(waveCount ? [{ label: 'Rollout waves', seats: rampSeats, months: waveMonths, total: rampCost, formula: `~${rampSeats} avg seats × ${money(inp.price)} × ${waveMonths} mo` }] : []),
+      { label: 'Full rollout, first 12 months', seats: audience, months: 12, total: fullYear, formula: `${audience} seats × ${money(inp.price)} × 12 mo` },
+    ],
+    fullMonthly,
+    total: pilotCost + rampCost + fullYear,
+    overBudget: inp.price > inp.budget,
+    budgetGap: (inp.price - inp.budget) * audience,
+  };
+  if (cost.overBudget) {
+    alerts.push({ kind: 'Budget', color: 'var(--amber)',
+      text: `The price (${money(inp.price)}) is over the budget of ${money(inp.budget)} per seat: ${money(cost.budgetGap)} a month over at full rollout. Negotiate, cut scope, or ask for more budget before Phase 4.` });
+  }
+  if (!hasIdp && audience > CONFIG.noIdpWarnAbove) {
+    alerts.push({ kind: 'Risk', color: 'var(--amber)',
+      text: `No identity provider for ${plural(audience, 'person', 'people')}. Above ${CONFIG.noIdpWarnAbove} people, manual offboarding is where seats and data access leak. Consider adding one before the waves.` });
+  }
+  if (hasIdp && !scim && audience > CONFIG.noIdpWarnAbove) {
+    alerts.push({ kind: 'Risk', color: 'var(--amber)',
+      text: `No SCIM: leavers keep their seats until someone removes them by hand. The weekly seat check in Phase 1 covers this; automatic setup would remove the job.` });
+  }
+
+  const breakEvenMinutes = inp.price / CONFIG.metrics.hourlyRate * 60;
+  const metrics = [
+    { name: 'Utilization', def: `Active seats ÷ paid seats. Active = used in the last ${CONFIG.metrics.unusedDays} days. Target: ${Math.round(CONFIG.metrics.utilizationTarget * 100)}% or more.` },
+    { name: 'Unused seats', def: `Seats with no activity for ${CONFIG.metrics.unusedDays}+ days. Reclaim them monthly.` },
+    { name: 'Hours saved', def: `Tasks completed with AI × minutes saved per task type ÷ 60. For a ${toolShort}, track ${tool.taskTypes} tasks.` },
+    { name: 'Estimated value', def: `Hours saved × loaded hourly rate (the tracker defaults to ${money(CONFIG.metrics.hourlyRate)}/hour).` },
+    { name: 'ROI', def: '(Estimated value − cost) ÷ cost.' },
+    { name: 'Break-even', def: `At ${money(inp.price)} a seat and ${money(CONFIG.metrics.hourlyRate)}/hour, each active seat pays for itself at about ${Math.round(breakEvenMinutes)} minutes saved a month.` },
+  ];
+
+  return {
+    inputs: inp, tool, idp, audience, teamsInScope, pilotSize, champions, waveCount, waveSize,
+    phases, start, target, buildWeeks, slackDays, cost, metrics, alerts,
+  };
+}
+
+// ---------- inputs ----------
+function fillSelect(el, entries) {
+  el.innerHTML = entries.map(([v, label]) => `<option value="${esc(v)}">${esc(label)}</option>`).join('');
+}
+fillSelect($('toolType'), Object.entries(CONFIG.toolTypes).map(([k, t]) => [k, t.label]));
+fillSelect($('idp'), Object.entries(CONFIG.idps).map(([k, t]) => [k, t.label]));
+
+function setDefaults() {
+  const d = CONFIG.defaults;
+  const t = CONFIG.toolTypes[d.toolType];
+  $('toolType').value = d.toolType;
+  $('headcount').value = d.headcount;
+  $('teams').value = d.teams;
+  $('scopePct').value = t.scopePct;
+  $('idp').value = d.idp;
+  $('scim').value = d.scim;
+  $('price').value = t.samplePrice;
+  $('budget').value = d.budget;
+  $('target').value = isoDate(defaultTarget());
+}
+
+const int = (v, min, max = Infinity) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : min;
+};
+const num = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : 0; };
+
+function readInputs() {
+  return {
+    toolType: $('toolType').value,
+    headcount: int($('headcount').value, 1, 1000000),
+    teams: int($('teams').value, 1, 10000),
+    scopePct: int($('scopePct').value, 1, 100),
+    idp: $('idp').value,
+    scim: $('scim').value,
+    price: num($('price').value),
+    budget: num($('budget').value),
+    target: parseDate($('target').value) || defaultTarget(),
+  };
+}
+
+// ---------- rendering ----------
+let currentPlan = null;
+
+function render() {
+  const plan = buildPlan(readInputs());
+  currentPlan = plan;
+  const inp = plan.inputs;
+
+  $('summary-lead').textContent =
+    `Rolling out a ${plan.tool.short} to ${plural(plan.audience, 'person', 'people')} across ${plural(plan.teamsInScope, 'team')}, everyone live by ${fmtDate(plan.target)}.`;
+
+  $('alerts').innerHTML = plan.alerts.map((a) =>
+    `<div class="alert" style="--accent:${a.color}"><span class="kind">${esc(a.kind)}</span><p>${esc(a.text)}</p></div>`).join('');
+
+  const startHint = plan.slackDays < 0 ? 'already past' : plan.slackDays === 0 ? 'start today' : `in ${plural(Math.ceil(plan.slackDays / 7), 'week')}`;
+  const cards = [
+    { label: 'Pilot group', value: plural(plan.pilotSize, 'person', 'people'), hint: `${plural(plan.champions, 'champion')}`, accent: 'var(--amber)' },
+    { label: 'Rollout waves', value: plan.waveCount || 'None', hint: plan.waveCount ? `about ${plan.waveSize} people each` : 'pilot covers everyone', accent: 'var(--cyan)' },
+    { label: 'Start by', value: fmtShort(plan.start), hint: `${weeks(plan.buildWeeks)} of work, ${startHint}`, accent: plan.slackDays < 0 ? 'var(--red)' : 'var(--green)' },
+    { label: 'Full cost (SAMPLE)', value: money(plan.cost.fullMonthly), hint: 'per month at full rollout', accent: plan.cost.overBudget ? 'var(--amber)' : 'var(--purple)' },
+  ];
+  $('cards').innerHTML = cards.map((c) =>
+    `<div class="card" style="--accent:${c.accent}"><div class="label">${esc(c.label)}</div><div class="value">${esc(c.value)}</div><div class="hint">${esc(c.hint)}</div></div>`).join('');
+
+  $('phases').innerHTML = plan.phases.map((p, i) => `
+    <article class="phase" style="--accent:${PHASE_COLORS[i]}">
+      <div class="phase-head">
+        <h3><span class="num">Phase ${i}</span>${esc(p.name)}</h3>
+        <span class="dates">${fmtDate(p.start)} – ${fmtDate(p.end)}</span>
+      </div>
+      <div class="meta"><span>Owner: <strong>${esc(p.owner)}</strong></span><span>Duration: <strong>${weeks(p.weeks)}</strong></span></div>
+      <p class="why"><b>Why:</b> ${esc(p.why)}</p>
+      <h4>Tasks</h4>
+      <ul>${p.tasks.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+      <h4>Exit criteria</h4>
+      <ul>${p.exit.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+    </article>`).join('');
+
+  $('cost-table').innerHTML = `
+    <thead><tr><th>Stage</th><th>How it's calculated</th><th>Cost</th></tr></thead>
+    <tbody>
+      ${plan.cost.rows.map((r) => `<tr><td>${esc(r.label)}</td><td class="formula">${esc(r.formula)}</td><td>${money(r.total)}</td></tr>`).join('')}
+      <tr class="total"><td>First-year total</td><td></td><td>${money(plan.cost.total)}</td></tr>
+    </tbody>`;
+  $('cost-note').innerHTML = plan.cost.overBudget
+    ? `<span class="neg">Over budget:</span> ${money(inp.price)} per seat vs ${money(inp.budget)} budget.`
+    : `<span class="pos">Within budget:</span> ${money(inp.price)} per seat vs ${money(inp.budget)} budget, leaving ${money((inp.budget - inp.price) * plan.audience)} a month of headroom.`;
+
+  $('metrics').innerHTML = plan.metrics.map((m) => `<dt>${esc(m.name)}</dt><dd>${esc(m.def)}</dd>`).join('');
+
+  $('timeline-lead').textContent = `${weeks(plan.buildWeeks)} of work ending on the target date, then ${weeks(CONFIG.weeks.measure)} of measuring.`;
+  drawTimeline(plan);
+}
+
+function drawTimeline(plan) {
+  const el = $('timeline');
+  const width = Math.max(300, el.clientWidth || 320);
+  const narrow = width < 560;
+  const labelW = narrow ? 0 : 190;
+  const rowH = narrow ? 44 : 30;
+  const top = 26;
+  const plotX = labelW + 4;
+  const plotW = width - plotX - 8;
+  const t0 = Math.min(plan.start, today());
+  const t1 = plan.phases[plan.phases.length - 1].end.getTime();
+  const x = (d) => plotX + ((d - t0) / (t1 - t0)) * plotW;
+  const height = top + plan.phases.length * rowH + 26;
+
+  let rows = '';
+  plan.phases.forEach((p, i) => {
+    const y = top + i * rowH;
+    const barY = narrow ? y + 18 : y + 6;
+    const label = `${i}. ${p.key === 'identity' ? 'SSO & accounts' : p.key[0].toUpperCase() + p.key.slice(1)}`;
+    const bx = x(p.start), bw = Math.max(3, x(p.end) - bx);
+    rows += narrow
+      ? `<text x="${Math.min(bx, width - 120)}" y="${y + 13}">${esc(label)} · ${weeks(p.weeks)}</text>`
+      : `<text x="0" y="${barY + 13}">${esc(label)}</text>`;
+    rows += `<rect x="${bx}" y="${barY}" width="${bw}" height="18" rx="4" fill="${PHASE_COLORS[i]}" opacity="${p.afterTarget ? 0.55 : 0.9}"><title>${esc(p.name)}: ${fmtDate(p.start)} – ${fmtDate(p.end)}</title></rect>`;
+    if (!narrow && bw > 50) rows += `<text x="${bx + 6}" y="${barY + 13}" style="fill:#07090d;font-size:11.5px;font-weight:600">${p.weeks}w</text>`;
+  });
+
+  // Month ticks along the bottom
+  let ticks = '';
+  const axisY = top + plan.phases.length * rowH + 4;
+  let m = new Date(new Date(t0).getFullYear(), new Date(t0).getMonth() + 1, 1);
+  const step = narrow ? 2 : 1;
+  for (let k = 0; m.getTime() <= t1; k++, m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
+    if (k % step) continue;
+    const mx = x(m);
+    ticks += `<line x1="${mx}" x2="${mx}" y1="${top - 4}" y2="${axisY}" stroke="var(--border)"/>`;
+    ticks += `<text class="axis" x="${mx}" y="${axisY + 14}" text-anchor="middle">${m.toLocaleDateString('en-US', { month: 'short' })}${m.getMonth() === 0 ? ' ' + String(m.getFullYear()).slice(2) : ''}</text>`;
+  }
+
+  const mark = (d, color, text, anchor) => {
+    const mx = x(d);
+    return `<line x1="${mx}" x2="${mx}" y1="${top - 6}" y2="${axisY}" stroke="${color}" stroke-width="2"/>`
+      + `<text class="mark" x="${mx}" y="${top - 10}" text-anchor="${anchor}" style="fill:${color}">${esc(text)}</text>`;
+  };
+  const todayAnchor = x(today()) < plotX + 40 ? 'start' : 'middle';
+  const marks = mark(today(), 'var(--amber)', 'Today', todayAnchor)
+    + mark(plan.target, 'var(--green)', `Target ${fmtShort(plan.target)}`, x(plan.target) > width - 80 ? 'end' : 'middle');
+
+  const summary = plan.phases.map((p, i) => `Phase ${i} ${p.name}, ${fmtDate(p.start)} to ${fmtDate(p.end)}`).join('; ');
+  el.innerHTML = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc('Timeline. ' + summary)}">${ticks}${marks}${rows}</svg>`;
+}
+
+// ---------- export ----------
+function planToMarkdown(plan) {
+  const inp = plan.inputs;
+  const L = [];
+  L.push(`# AI rollout plan: ${plan.tool.label}`, '');
+  L.push('> Built with sample data to protect confidentiality. Prices are SAMPLE values, not real vendor pricing.', '');
+  L.push(`- **Scope:** ${plural(plan.audience, 'person', 'people')} across ${plural(plan.teamsInScope, 'team')} (${inp.scopePct}% of ${inp.headcount})`);
+  L.push(`- **Identity provider:** ${plan.idp.label}; automatic account setup (SCIM): ${inp.scim === 'yes' ? 'yes' : 'no'}`);
+  L.push(`- **Start by:** ${fmtDate(plan.start)}  **Everyone live by:** ${fmtDate(plan.target)} (${weeks(plan.buildWeeks)})`);
+  L.push(`- **Pilot:** ${plural(plan.pilotSize, 'person', 'people')}, ${plural(plan.champions, 'champion')}; then ${plan.waveCount ? `${plural(plan.waveCount, 'wave')} of about ${plan.waveSize}` : 'no waves needed'}`);
+  L.push('');
+  if (plan.alerts.length) {
+    L.push('## Watch-outs', '');
+    plan.alerts.forEach((a) => L.push(`- **${a.kind}:** ${a.text}`));
+    L.push('');
+  }
+  plan.phases.forEach((p, i) => {
+    L.push(`## Phase ${i}: ${p.name}`, '');
+    L.push(`- **Owner:** ${p.owner}`);
+    L.push(`- **Duration:** ${weeks(p.weeks)} (${fmtDate(p.start)} – ${fmtDate(p.end)})`);
+    L.push(`- **Why:** ${p.why}`, '');
+    L.push('**Tasks**', '');
+    p.tasks.forEach((t) => L.push(`- [ ] ${t}`));
+    L.push('', '**Exit criteria**', '');
+    p.exit.forEach((t) => L.push(`- ${t}`));
+    L.push('');
+  });
+  L.push('## Cost estimate (SAMPLE price)', '');
+  L.push('| Stage | How it\'s calculated | Cost |', '|---|---|---:|');
+  plan.cost.rows.forEach((r) => L.push(`| ${r.label} | ${r.formula} | ${money(r.total)} |`));
+  L.push(`| **First-year total** | | **${money(plan.cost.total)}** |`, '');
+  L.push(`Budget: ${money(inp.budget)} per seat per month; price: ${money(inp.price)}${plan.cost.overBudget ? ' (over budget)' : ' (within budget)'}.`, '');
+  L.push('## Success metrics', '');
+  plan.metrics.forEach((m) => L.push(`- **${m.name}:** ${m.def}`));
+  L.push('', `Measure them in the AI Value Tracker: ${CONFIG.trackerUrl}`, '');
+  return L.join('\n');
+}
+
+function flash(msg) {
+  $('export-status').textContent = msg;
+  clearTimeout(flash.t);
+  flash.t = setTimeout(() => { $('export-status').textContent = ''; }, 3000);
+}
+
+async function copyPlan() {
+  const text = planToMarkdown(currentPlan);
+  try {
+    await navigator.clipboard.writeText(text);
+    flash('Copied. Paste it into a ticket or doc.');
+  } catch {
+    // Older browsers or non-secure pages: fall back to a hidden textarea.
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    flash(ok ? 'Copied. Paste it into a ticket or doc.' : 'Copy was blocked by the browser. Use Download instead.');
+  }
+}
+
+function downloadPlan() {
+  const blob = new Blob([planToMarkdown(currentPlan)], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ai-rollout-plan-${currentPlan.inputs.toolType}-${isoDate(currentPlan.target)}.md`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  flash('Downloaded.');
+}
+
+// ---------- wiring ----------
+$('inputs').addEventListener('input', render);
+$('toolType').addEventListener('change', () => {
+  const t = CONFIG.toolTypes[$('toolType').value];
+  $('price').value = t.samplePrice;
+  $('scopePct').value = t.scopePct;
+  render();
+});
+$('reset').addEventListener('click', () => { setDefaults(); render(); });
+$('copy').addEventListener('click', copyPlan);
+$('download').addEventListener('click', downloadPlan);
+
+const ruleList = [
+  `Pilot size: ${Math.round(CONFIG.pilot.share * 100)}% of people in scope, at least ${CONFIG.pilot.perTeamMin} per team, between ${CONFIG.pilot.min} and ${CONFIG.pilot.max} people.`,
+  `Champions: ${CONFIG.champions.perTeam} per team, or ${CONFIG.champions.perBigTeam} when teams average more than ${CONFIG.champions.bigTeamSize} people.`,
+  `Waves: about ${CONFIG.waves.targetSize} people each, never more than ${CONFIG.waves.maxWaves} waves (big companies get bigger waves), ${weeks(CONFIG.waves.weeksEach)} per wave.`,
+  `Prep: ${weeks(CONFIG.weeks.prep)}, plus ${weeks(CONFIG.weeks.largeOrgExtraPrep)} above ${CONFIG.weeks.largeOrg.toLocaleString('en-US')} people.`,
+  `Sign-in: ${weeks(CONFIG.weeks.sso)} for SSO, plus ${weeks(CONFIG.weeks.scim)} if SCIM is available; ${weeks(CONFIG.weeks.noIdp)} with no identity provider.`,
+  `Pilot ${weeks(CONFIG.weeks.pilot)}, training ${weeks(CONFIG.weeks.training)}, measuring ${weeks(CONFIG.weeks.measure)} after the target date.`,
+  'Timeline: phases 0–4 are stacked back from the target date; if the start falls before today, the plan says how late it is.',
+  `Cost: seats × price × months (a month is 52 ÷ 12 weeks, rounded up). During the waves, seats are averaged halfway between pilot and everyone.`,
+  `Coding assistants default to ${CONFIG.toolTypes.coding.scopePct}% of staff in scope (people who write code); the other tool types default to everyone.`,
+];
+$('rules').innerHTML = ruleList.map((r) => `<li>${esc(r)}</li>`).join('');
+
+setDefaults();
+render();
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => drawTimeline(currentPlan), 120);
+});
+</script>
+</body>
+</html>
