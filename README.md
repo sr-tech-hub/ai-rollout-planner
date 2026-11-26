@@ -47,9 +47,9 @@ Live demo: https://sr-tech-hub.github.io/ai-rollout-planner/
 
 ## Part of a set
 Three small tools covering the life of an AI tool at a company:
-- **AI Tool Risk Triage:** should we approve it?
+- **[AI Tool Risk Triage](https://sr-tech-hub.github.io/ai-tool-risk-triage/)** ([code](https://github.com/sr-tech-hub/ai-tool-risk-triage)): should we approve it?
 - **AI Rollout Planner** (this one): how do we roll it out?
-- **[AI Value Tracker](https://sr-tech-hub.github.io/ai-value-tracker/):** is it paying off?
+- **[AI Value Tracker](https://sr-tech-hub.github.io/ai-value-tracker/)** ([code](https://github.com/sr-tech-hub/ai-value-tracker)): is it paying off?
 
 ## Built with
 HTML, CSS and JavaScript (single page, no build step, no libraries; the timeline is plain SVG), developed with Claude Code.
