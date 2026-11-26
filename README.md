@@ -45,8 +45,8 @@ Change the inputs and the plan changes with them. Switching the identity provide
 
 Live demo: https://sr-tech-hub.github.io/ai-rollout-planner/
 
-## Part of a set
-Three small tools covering the life of an AI tool at a company:
+## Part of the AI Adoption Toolkit
+Three small tools covering the life of an AI tool at a company, linked by a shared menu bar:
 - **[AI Tool Risk Triage](https://sr-tech-hub.github.io/ai-tool-risk-triage/)** ([code](https://github.com/sr-tech-hub/ai-tool-risk-triage)): should we approve it?
 - **AI Rollout Planner** (this one): how do we roll it out?
 - **[AI Value Tracker](https://sr-tech-hub.github.io/ai-value-tracker/)** ([code](https://github.com/sr-tech-hub/ai-value-tracker)): is it paying off?
